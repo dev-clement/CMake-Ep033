@@ -1,0 +1,202 @@
+= Variables in CMake
+In this article, we'll see how we can define our own variables in CMake and how to use option flags to enable / disable some options.
+
+:toc:
+:sectnums:
+
+== Introduction
+In the current project, we have several `CMakeLists.txt`, and if we take the CMake list file frome the `app`, you'll see that the name of the app is specified in several places, like so:
+
+```cmake
+add_executable(executable ./src/main.cpp)
+target_link_libraries(executable PUBLIC Library)
+target_include_directories(executable PUBLIC ./include/)
+```
+As you can notice, the `executable` name is present at 3 places, that means we have to make sure that the name isn't different, or it won't make the correct build / application.
+
+What we can do instead is using a CMake variable. As we also know, in this project the `executable` is placed in the subdirectory, so we can declare a variable in the main `CMakeLists.txt` like this:
+
+```cmake
+cmake_minimum_required(VERSION 3.28)
+
+project(CppProjectTemplate
+        VERSION 0.0.1
+        LANGUAGES C CXX)
+
+set(LIBRARY_NAME Library)
+set(EXECUTABLE Executable)
+
+add_subdirectory(my_lib/)
+add_subdirectory(app/)
+```
+
+So inside of the root `CMakeLists.txt` file you'll create 2 variables:
+
+. One for the library to declare the name of it
+. One for the binary like the library, we declare its name
+
+The variable is declared using the `set` command:
+
+== set
+
+`set` a normal, cache, or environment variable to a given value. See the link:https://cmake.org/cmake/help/latest/manual/cmake-language.7.html#cmake-language-variables[cmake language variables] documentations for more information for the scopes and interaction of normal variables and caches entries.
+
+Signature of this command that specify a `<value>...` placeholder expect zero or more arguments. Multiple arguments will be joined add a link:https://cmake.org/cmake/help/latest/manual/cmake-language.7.html#cmake-language-lists[semicolon-separated] list to form the actual variable value to be set.
+
+NOTE: When you are defining a variable using the `set` command, if you are not specifying the quotes between start and end of the string, the CMake is clever enough to know that the type of the variable is a string, same as number, and so on.
+
+=== Using a variable
+
+In order to use the variable we defined using the `set` command, we have to do the following:
+
+```cmake
+# We declare a variable VAR with value "toto"
+set(VAR toto)
+
+# We declare an executable with the name "toto"
+add_executable(${VAR} main.cpp)
+```
+
+When you are defining a variable, the best way to do so is to define the variable at the upper `CMakeLists.txt` file, those variables can then be used in any subdirectory of the upper `CMakeLists.txt` file.
+
+=== Using set to override variables
+In some `CMakeLists.txt` file you maybe want to define some config variables, and you can do it using the `set` command like this:
+
+```cmake
+set(CMAKE_CXX_STANDARD 20)
+```
+In the line above, we set the c++ standard of the project to be `20`. And every target present in the CMake will have the cxx standard set to `20`. Another variable that is kind of important in CMake is:
+
+```cmake
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+```
+This variable is a boolean, that can be set to either `ON` or `OFF`, kind of `YES` or `NO`.
+
+```cmake
+set(CMAKE_CXX_EXTENSIONS OFF)
+```
+This variable set the `CXX_EXTENSIONS` variable, that is a boolean specifying whether compiler specific extensions are requested. In that case here, what we call `EXTENSIONS` are the feature that the compiler have that the other compiler won't.
+
+IMPORTANT: You should always set those variables (the ones above) to your projects
+
+== Options
+In CMake you can also set what we call `options`, that are booleans that the user can optionally select.
+
+=== Create an option variable
+
+```cmake
+option(<variable> "<help_text>" [value])
+```
+If no initial `<value>` is provided, bollean `OFF` is the default value. If `<variable>` is already set as a normal or cache variable, then the command does nothing.
+
+In CMake project mode, a boolean cache variable is created with the option value. In CMake script mode, a boolean variable is set with the option value.
+
+IMPORTANT: But still, options are variables, that are just simple boolean being `ON` or `OFF`.
+
+=== Example
+
+For example, here is an example:
+```cmake
+option(COMPILE_EXECUTABLE "Whether to compile the executable")
+```
+By default, if it's not selected the variable is set ti `OFF`. The text after the name of the option isn't mandatory, it's just a hint in this case.
+
+If we put it to the CMakeLists present at the top directory:
+```cmake
+...
+option(COMPILE_EXECUTABLE "Whether to compile the executable")
+
+...
+if (COMPILE_EXECUTABLE)
+    add_subdirectory(app/)
+endif()
+```
+So you can check if `COMPILE_EXECUTABLE` is `true` or `false`, or even `ON` or `OFF` in CMake, and if it is `ON`, we will run the target in the subdirectory `app/`.
+
+And thanks to this `if` statement, we can then make an `else` to message to the console:
+
+```cmake
+...
+if (COMPILE_EXECUTABLE)
+    add_subdirectory(app/)
+else()
+    message("Without exe. Compiling")
+endif()
+```
+And if you run the `cmake` without passing any value to the variable `option`, we will have the following output:
+
+```txt
+...
+Without exe. Compiling
+-- Configuring done (5.3s)
+-- Generating done (0.2s)
+-- Build files have been written to: /mnt/c/workspace/CMakeSeries/CMake-Ep033/build
+```
+=== Modify the value of options in CLI
+
+And if you want to compile the app now, you will need to change the CLI to make the build:
+
+```cmake
+$ cmake -S . -B build -G "Unix Makefiles" -D COMPILE_EXECUTABLE=ON
+```
+This command will then let you create the `app` target in the makefile that cmake will generates.
+
+=== Build type
+In `CMake` there is also a variable that let you specify the kind of build type your cmake has to generate:
+
+```cmake
+set(CMAKE_BUILD_TYPE <value>)
+```
+The build type values are the followings:
+
+* Debug
+* Release
+* RelWithDebInfo
+* MinSizeRel
+
+However, custom build types can also be defined. This variable is initialized by the first `project()` or `enable_language()` commands called in a project when a new build tree is first created. If the `CMAKE_BUILD_TYPE` environment variable is set, its value is used. Otherwise, a toolchain specific default is chosen when a language is enabled. The default value is often an empty string, but this is usually not desirables and one of the other standard build types is usually more appropriate.
+
+Depending on the situations, the value of this variable amay be treated case-sensitively or case-insensitively. See link:https://cmake.org/cmake/help/latest/manual/cmake-buildsystem.7.html#build-configurations[Build configuration] for discussion of this and other related topics.
+
+For multi-config generators, see link:https://cmake.org/cmake/help/latest/variable/CMAKE_CONFIGURATION_TYPES.html#variable:CMAKE_CONFIGURATION_TYPES[CMAKE_CONFIGURATION_TYPES]
+
+== Cache variables
+The Cmake cache may be thought as a configuration file. The first time CMake is run on a project, it produces a `CMakeCaches.txt` file in the top directory of the uild tree. CMake uses this file to store a set of global cache variables, whose values persist across multiple runs within a project build tree.
+
+There are a few purposes of this cache. The first is to store the user's selections and choices, so that if they should run CMake again, they will not need to reenter that information. For example the link:https://cmake.org/cmake/help/latest/command/option.html#command:option[option] command creates a Boolean variable and stores it in the cache.
+
+```cmake
+option(USE_JPEG "Do you want to use the jpeg library")
+```
+The above line would create a variable called `USE_JPEG` and put it into the cache. That way, the user can set that variable from the user interface and its value will remain in case the user should run CMake again in the future.
+
+=== Create cache variable
+In order to create a variable to the cache, you can use the commands like: link:https://cmake.org/cmake/help/latest/command/option.html#command:option[options], link:https://cmake.org/cmake/help/latest/command/find_file.html#command:find_file[find-file] or the standard link:https://cmake.org/cmake/help/latest/command/set.html#command:set[set] command with the `CACHE` option:
+
+```cmake
+set(USE_JPG ON CACHE BOOL "Include jpeg support ?")
+```
+
+=== Defining a user variable
+When you are defining a user variable (a variable that the user creates). Let's take a look to the previous example of the variable named `COMPILE_EXECUTABLE` that let you know if you want to compile the executable or not,
+
+Let's say you want to make it `ON` once, and only once, so if you recall the variable is the one we make:
+
+```cmake
+option(COMPILE_EXECUTABLE "Whether to compile the executable")
+
+add_subdirectory(my_lib/)
+if (COMPILE_EXECUTABLE)
+    add_subdirectory(app/)
+else()
+    message("Without exe. Compiling")
+endif()
+```
+And if we want to make it `ON` for the next build without modifying the `CMakeLists.txt`, you just need to change the `CMakeCache.txt` that is generated and modifying the value from there.
+
+NOTE: Another way to change the boolean value of `COMPILE_EXECUTABLE` is remake the build directory and set the value of the variable in the command like so:
+
+```shell
+$ cmake -S . -B build -G "Unix Makefiles" -DCOMPILE_EXECUTABLE=<OFF|ON>
+```
+Still, if you decide to do it using this command, you'll rebuild the entire project, and it can take a lot of time depending on the project you are working on, so make use of the cache when you can !
